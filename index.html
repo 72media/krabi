@@ -79,7 +79,6 @@
   }
   .pop-actions { display: flex; align-items: center; gap: 8px; }
   
-  /* พิกัด */
   .pop-coord { 
     font-size: 12px; font-weight: 500; color: #475569; 
     background: #f8fafc; border: 1px solid #e2e8f0;
@@ -89,12 +88,11 @@
   }
   .pop-coord:hover { background: #e2e8f0; color: #0f172a; border-color: #cbd5e1; }
   
-  /* ปุ่มดูภาพนิ่ง (บังคับสีให้ชัดเจนด้วย !important) */
   .btn-snap { 
     display: inline-flex; align-items: center; gap: 4px; 
     font-size: 12px; font-weight: 600; 
-    color: #ffffff !important; /* บังคับตัวอักษรสีขาว */
-    background: #0b5cad !important; /* บังคับพื้นหลังสีน้ำเงินเข้ม */
+    color: #ffffff !important; 
+    background: #0b5cad !important; 
     padding: 5px 12px; border-radius: 6px; 
     text-decoration: none; white-space: nowrap; 
     box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
@@ -107,7 +105,6 @@
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
   }
 
-  /* กล่องภาพ */
   .pop-box { width: 440px; max-width: 100%; aspect-ratio: 16 / 9; background: #1e293b; border-radius: 8px; overflow: hidden; position: relative; }
   .pop-box img { width: 100%; height: 100%; object-fit: contain; display: block; cursor: pointer; }
   .pop-box video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
@@ -125,7 +122,6 @@
     box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4);
   }
 
-  /* ปุ่มเต็มจอ */
   .fs-btn {
     position: absolute; top: 8px; right: 8px; z-index: 2; border: 0; border-radius: 6px;
     padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
@@ -138,7 +134,6 @@
     padding: 6px 10px; font-size: 12px; color: #ffd98a; background: rgba(0,0,0,.65);
   }
 
-  /* สถานีฝน Popup */
   .rain-popup .leaflet-popup-content-wrapper { padding: 0; overflow: hidden; border-radius: 14px; border: none; }
   .rain-popup .leaflet-popup-content { margin: 0; width: 300px !important; }
   .rain-popup a.leaflet-popup-close-button { color: #fff; top: 8px; right: 8px; }
@@ -160,7 +155,6 @@
   .rp-foot { margin-top: 8px; font-size: 10.5px; color: #94a3b8; }
   .rp-err { color: #b91c1c; padding: 4px 0; }
 
-  /* Windy Panel */
   #satPanel { position: absolute; inset: 0; z-index: 900; background: #000; display: none; }
   #satFrame { display: block; width: 100%; height: 100%; border: 0; }
   #satBar {
@@ -222,6 +216,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-gpx@2.2.0/gpx.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
 <script>
   // ---- ตั้งค่า ----
@@ -233,10 +228,12 @@
   const MAP_CENTER = [7.52, 99.86];
   const MAP_ZOOM = 8;
 
+  // ---> แก้ไข Fallback ให้ชี้ไปที่ GitHub ของคุณ <---
+  const FALLBACK_URL = "https://raw.githubusercontent.com/72media/krabi/main/" + encodeURIComponent("สะพานบ้านท่าคลอง.jpg");
+  const GPX_URL = "https://raw.githubusercontent.com/72media/krabi/main/" + encodeURIComponent("กระบี่.gpx");
+
   const SNAP_URL = "/cam.jpg";
   const REFRESH_MS = 2000;
-  // ใช้ภาพ Static จาก Unsplash แทนเพื่อให้ชัวร์ว่าโหลดขึ้นแน่ๆ ไม่จอดำ
-  const FALLBACK_URL = "https://images.unsplash.com/photo-1541888049877-858c958124a2?auto=format&fit=crop&w=800&q=80";
 
   const CAM_HOST = "http://live:Live2023!@bantakhlong.dyndns.info:5001";
   const CAM_PAGE_URL = CAM_HOST + "/fullscreen.htm?stream=2&autoresize=true";
@@ -254,7 +251,23 @@
   });
 
   googleLayer.addTo(map);
-  L.control.layers({ "ภาพถ่ายดาวเทียม": googleLayer, "ภูมิประเทศ": openTopoLayer }, null, { position: 'topright' }).addTo(map);
+
+  // ---> เพิ่มเลเยอร์ขอบเขตจังหวัดจาก GPX <---
+  const krabiBoundary = new L.GPX(GPX_URL, {
+    async: true,
+    marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null },
+    polyline_options: { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '5, 5' }
+  }).on('loaded', e => {
+    // สามารถปรับ map ให้ fit bounds อัตโนมัติเมื่อโหลดเสร็จ (ถ้าต้องการ)
+    // map.fitBounds(e.target.getBounds());
+  });
+
+  // เพิ่ม GPX เป็น Overlay Layer ในตัวเลือกมุมขวาบน
+  L.control.layers(
+    { "ภาพถ่ายดาวเทียม": googleLayer, "ภูมิประเทศ": openTopoLayer }, 
+    { "ขอบเขตจังหวัดกระบี่ (GPX)": krabiBoundary }, 
+    { position: 'topright' }
+  ).addTo(map);
 
   // ---- 2. นาฬิกา ----
   function thaiNow() {
@@ -307,30 +320,25 @@
 
   function tick() {
     if (!running) return;
-    
-    // สร้าง Object Image ใหม่เพื่อโหลดรูปเบื้องหลัง
     const next = new Image();
     next.onload = () => {
       if (!running) return;
-      img.src = next.src; // เมื่อโหลดเสร็จค่อยเอามาใส่ (แก้ปัญหากะพริบ)
+      img.src = next.src;
       timer = setTimeout(tick, REFRESH_MS);
     };
     next.onerror = () => {
       if (!running) return;
-      // ถ้าดึงภาพสดไม่ได้ ให้ใช้ภาพ Fallback
       img.src = FALLBACK_URL;
-      timer = setTimeout(tick, 5000); // ลองใหม่ใน 5 วิ
+      timer = setTimeout(tick, 5000);
     };
-    // ใส่ Cache Buster กันเบราว์เซอร์จำภาพเก่า
     next.src = SNAP_URL + "?t=" + Date.now();
   }
 
   marker.on("popupopen", () => {
     running = true;
     clearTimeout(timer);
-    // สำคัญ: โชว์ภาพ Fallback ไว้ก่อนทันที จะได้ไม่เห็นจอดำ
     img.src = FALLBACK_URL; 
-    tick(); // แล้วค่อยไปดึงภาพสดทับ
+    tick(); 
   });
   
   marker.on("popupclose", () => {
