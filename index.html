@@ -216,7 +216,6 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/leaflet-gpx@2.2.0/gpx.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
 <script>
   // ---- ตั้งค่า ----
@@ -228,9 +227,10 @@
   const MAP_CENTER = [7.52, 99.86];
   const MAP_ZOOM = 8;
 
-  // ---> แก้ไข Fallback ให้ชี้ไปที่ GitHub ของคุณ <---
   const FALLBACK_URL = "https://raw.githubusercontent.com/72media/krabi/main/" + encodeURIComponent("สะพานบ้านท่าคลอง.jpg");
-  const GPX_URL = "https://raw.githubusercontent.com/72media/krabi/main/" + encodeURIComponent("กระบี่.gpx");
+  
+  // เปลี่ยนจาก GPX เป็น GeoJSON (แนะนำให้อัปโหลดไฟล์ krabi.geojson ขึ้น GitHub)
+  const GEOJSON_URL = "https://raw.githubusercontent.com/72media/krabi/main/krabi.geojson";
 
   const SNAP_URL = "/cam.jpg";
   const REFRESH_MS = 2000;
@@ -252,20 +252,33 @@
 
   googleLayer.addTo(map);
 
-  // ---> เพิ่มเลเยอร์ขอบเขตจังหวัดจาก GPX <---
-  const krabiBoundary = new L.GPX(GPX_URL, {
-    async: true,
-    marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null },
-    polyline_options: { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '5, 5' }
-  }).on('loaded', e => {
-    // สามารถปรับ map ให้ fit bounds อัตโนมัติเมื่อโหลดเสร็จ (ถ้าต้องการ)
-    // map.fitBounds(e.target.getBounds());
+  // ---> สร้าง Layer ว่างไว้รอโหลด GeoJSON <---
+  var krabiBoundary = L.geoJSON(null, {
+    style: {
+      color: '#f59e0b',      // สีเส้นขอบ (ส้ม)
+      weight: 3,             // ความหนาเส้น
+      opacity: 0.9,          // ความทึบของเส้น
+      fillColor: '#f59e0b',  // สีพื้นหลัง
+      fillOpacity: 0.1,      // ความจางของพื้นหลัง (โปร่งใส)
+      dashArray: '5, 5'      // เส้นประ
+    }
   });
 
-  // เพิ่ม GPX เป็น Overlay Layer ในตัวเลือกมุมขวาบน
+  // ดึงข้อมูล GeoJSON
+  fetch(GEOJSON_URL)
+    .then(res => {
+      if (!res.ok) throw new Error("ไม่พบไฟล์ GeoJSON");
+      return res.json();
+    })
+    .then(data => {
+      krabiBoundary.addData(data);
+    })
+    .catch(err => console.warn("ไม่สามารถโหลดขอบเขตจังหวัดได้:", err.message));
+
+  // เพิ่มเป็น Overlay Layer
   L.control.layers(
     { "ภาพถ่ายดาวเทียม": googleLayer, "ภูมิประเทศ": openTopoLayer }, 
-    { "ขอบเขตจังหวัดกระบี่ (GPX)": krabiBoundary }, 
+    { "ขอบเขตจังหวัดกระบี่": krabiBoundary }, 
     { position: 'topright' }
   ).addTo(map);
 
