@@ -229,8 +229,8 @@
 
   const FALLBACK_URL = "https://raw.githubusercontent.com/72media/krabi/main/" + encodeURIComponent("สะพานบ้านท่าคลอง.jpg");
   
-  // เปลี่ยนจาก GPX เป็น GeoJSON (แนะนำให้อัปโหลดไฟล์ krabi.geojson ขึ้น GitHub)
-  const GEOJSON_URL = "https://raw.githubusercontent.com/72media/krabi/main/krabi.geojson";
+  // ไฟล์ GeoJSON จาก GitHub
+  const GEOJSON_URL = "https://raw.githubusercontent.com/72media/krabi/main/Krabi.geojson";
 
   const SNAP_URL = "/cam.jpg";
   const REFRESH_MS = 2000;
@@ -252,14 +252,14 @@
 
   googleLayer.addTo(map);
 
-  // ---> สร้าง Layer ว่างไว้รอโหลด GeoJSON <---
+  // ---> สร้าง Layer ขอบเขตจังหวัด (สีแดง) <---
   var krabiBoundary = L.geoJSON(null, {
     style: {
-      color: '#f59e0b',      // สีเส้นขอบ (ส้ม)
-      weight: 3,             // ความหนาเส้น
-      opacity: 0.9,          // ความทึบของเส้น
-      fillColor: '#f59e0b',  // สีพื้นหลัง
-      fillOpacity: 0.1,      // ความจางของพื้นหลัง (โปร่งใส)
+      color: '#ef4444',      // สีเส้นขอบ (แดง)
+      weight: 3.5,           // ความหนาเส้น
+      opacity: 1,            // ความทึบของเส้น
+      fillColor: '#ef4444',  // สีพื้นหลัง
+      fillOpacity: 0.15,     // ความจางของพื้นหลัง (โปร่งใส)
       dashArray: '5, 5'      // เส้นประ
     }
   });
@@ -267,15 +267,18 @@
   // ดึงข้อมูล GeoJSON
   fetch(GEOJSON_URL)
     .then(res => {
-      if (!res.ok) throw new Error("ไม่พบไฟล์ GeoJSON");
+      if (!res.ok) throw new Error("HTTP " + res.status + " - ไม่พบไฟล์ Krabi.geojson");
       return res.json();
     })
     .then(data => {
       krabiBoundary.addData(data);
+      console.log("✅ โหลดขอบเขตจังหวัดสำเร็จ");
     })
-    .catch(err => console.warn("ไม่สามารถโหลดขอบเขตจังหวัดได้:", err.message));
+    .catch(err => {
+      console.warn("❌ ไม่สามารถโหลดขอบเขตจังหวัดได้:", err.message);
+    });
 
-  // เพิ่มเป็น Overlay Layer
+  // เพิ่มเป็น Overlay Layer (ตัวเลือกมุมขวาบน)
   L.control.layers(
     { "ภาพถ่ายดาวเทียม": googleLayer, "ภูมิประเทศ": openTopoLayer }, 
     { "ขอบเขตจังหวัดกระบี่": krabiBoundary }, 
