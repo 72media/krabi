@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เรดาร์ตรัง 240 กม. + กล้องสะพานบ้านท่าคลอง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { height: 100%; margin: 0; font-family: "Prompt", sans-serif; }
+  #map { position: absolute; inset: 0; }
+
+  /* --- 1. แถบเรดาร์ (Glassmorphism) --- */
+  .ctl {
+    position: absolute; top: 96px; left: 10px; z-index: 1000; width: 280px; overflow: hidden;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.15);
+    font-size: 14px;
+    transition: all 0.3s ease;
+  }
+  .ctl-head {
+    display: flex; align-items: center; gap: 8px; padding: 14px 16px; cursor: pointer;
+    background: linear-gradient(135deg, rgba(11, 92, 173, 0.9), rgba(30, 136, 229, 0.8)); 
+    color: #fff; user-select: none;
+  }
+  .ctl-head .ttl { flex: 1; font-size: 16px; font-weight: 600; }
+  .ctl-head .credit {
+    display: inline-block; vertical-align: middle; white-space: nowrap; margin-left: 2px;
+    padding: 2px 9px; border-radius: 11px; font-size: 11px; font-weight: 500;
+    background: rgba(255,255,255,.25); color: #fff; text-decoration: none;
+  }
+  .ctl-head .credit:hover { background: rgba(255,255,255,.4); }
+  .ctl-head .chev {
+    width: 28px; height: 28px; border: 0; border-radius: 50%; cursor: pointer; padding: 0;
+    background: rgba(255,255,255,.2); color: #fff; font-size: 12px; line-height: 28px; transition: transform .3s;
+  }
+  .ctl.collapsed .chev { transform: rotate(180deg); }
+  .ctl-body { padding: 14px 16px 16px; }
+  .ctl.collapsed .ctl-body { display: none; }
+  
+  .ctl .clock { line-height: 1.4; color: #334155; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.08); margin-bottom: 12px; }
+  .ctl .clock .time { font-size: 20px; font-weight: 700; color: #0b5cad; }
+  .ctl .title { font-weight: 600; font-size: 15px; margin-bottom: 10px; color: #1e293b; }
+
+  /* --- 2. Toggle Switch --- */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin: 10px 0; cursor: pointer; }
+  .toggle-row span { color: #334155; font-weight: 400; }
+  .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; border-radius: 22px; }
+  .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+  input:checked + .slider { background-color: #0b5cad; }
+  input:checked + .slider:before { transform: translateX(18px); }
+
+  .ctl a.ext-link { display: block; margin: 14px 0 0; color: #0b5cad; font-weight: 500; text-decoration: none; font-size: 13px; padding: 8px 12px; background: rgba(11, 92, 173, 0.08); border-radius: 8px; transition: 0.2s; text-align: center; }
+  .ctl a.ext-link:hover { background: rgba(11, 92, 173, 0.15); }
+
+  /* --- 3. ป๊อปอัพ (Popup UI) --- */
+  .leaflet-popup-content-wrapper { 
+    border-radius: 14px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+    border: 1px solid rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+  .leaflet-popup-content { margin: 0; padding: 14px; }
+  
+  .pop-title {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+    margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9;
+  }
+  .pop-title-text {
+    font-size: 15px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 6px;
+  }
+  .pop-actions { display: flex; align-items: center; gap: 8px; }
+  
+  /* พิกัด */
+  .pop-coord { 
+    font-size: 12px; font-weight: 500; color: #475569; 
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    padding: 5px 10px; border-radius: 6px; 
+    text-decoration: none; white-space: nowrap; transition: all 0.2s;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .pop-coord:hover { background: #e2e8f0; color: #0f172a; border-color: #cbd5e1; }
+  
+  /* ปุ่มดูภาพนิ่ง (บังคับสีให้ชัดเจนด้วย !important) */
+  .btn-snap { 
+    display: inline-flex; align-items: center; gap: 4px; 
+    font-size: 12px; font-weight: 600; 
+    color: #ffffff !important; /* บังคับตัวอักษรสีขาว */
+    background: #0b5cad !important; /* บังคับพื้นหลังสีน้ำเงินเข้ม */
+    padding: 5px 12px; border-radius: 6px; 
+    text-decoration: none; white-space: nowrap; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+    transition: all 0.2s ease;
+    border: none;
+  }
+  .btn-snap:hover { 
+    background: #094b8e !important; 
+    transform: translateY(-1px); 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  }
+
+  /* กล่องภาพ */
+  .pop-box { width: 440px; max-width: 100%; aspect-ratio: 16 / 9; background: #1e293b; border-radius: 8px; overflow: hidden; position: relative; }
+  .pop-box img { width: 100%; height: 100%; object-fit: contain; display: block; cursor: pointer; }
+  .pop-box video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+
+  /* --- 4. ไอคอน Marker --- */
+  .cam-icon {
+    background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; border: 2px solid #fff; border-radius: 50%;
+    width: 32px; height: 32px; line-height: 28px; text-align: center; font-size: 16px;
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+  }
+  .cam-icon.gistda { background: linear-gradient(135deg, #3b82f6, #1d4ed8); box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4); }
+  .rain-icon {
+    background: linear-gradient(135deg, #0ea5e9, #0369a1); color: #fff; border: 2px solid #fff; border-radius: 50%;
+    width: 32px; height: 32px; line-height: 28px; text-align: center; font-size: 16px;
+    box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4);
+  }
+
+  /* ปุ่มเต็มจอ */
+  .fs-btn {
+    position: absolute; top: 8px; right: 8px; z-index: 2; border: 0; border-radius: 6px;
+    padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+    background: rgba(0,0,0,.6); color: #fff; backdrop-filter: blur(4px);
+    transition: 0.2s;
+  }
+  .fs-btn:hover { background: rgba(0,0,0,.85); }
+  .vid-msg {
+    position: absolute; left: 0; right: 0; bottom: 44px; z-index: 2; text-align: center;
+    padding: 6px 10px; font-size: 12px; color: #ffd98a; background: rgba(0,0,0,.65);
+  }
+
+  /* สถานีฝน Popup */
+  .rain-popup .leaflet-popup-content-wrapper { padding: 0; overflow: hidden; border-radius: 14px; border: none; }
+  .rain-popup .leaflet-popup-content { margin: 0; width: 300px !important; }
+  .rain-popup a.leaflet-popup-close-button { color: #fff; top: 8px; right: 8px; }
+  .rp-head { padding: 14px 36px 14px 16px; color: #fff; background: linear-gradient(135deg, #0284c7, #38bdf8); }
+  .rp-head .n { font-size: 15px; font-weight: 700; line-height: 1.25; }
+  .rp-head .s { font-size: 11px; opacity: .9; margin-top: 2px; }
+  .rp-body { padding: 12px 14px 14px; font-size: 13px; }
+  .rp-sec { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .4px; margin: 2px 0 6px; }
+  .rp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+  .rp-tile { border-radius: 8px; padding: 8px 4px; text-align: center; background: #f1f5f9; color: #334155; }
+  .rp-tile b { display: block; font-size: 18px; line-height: 1.15; }
+  .rp-tile small { display: block; font-size: 10.5px; opacity: .85; }
+  .rp-tile.l1 { background: #e0f2fe; color: #0369a1; }
+  .rp-tile.l2 { background: #7dd3fc; color: #082f49; }
+  .rp-tile.l3 { background: #fcd34d; color: #78350f; }
+  .rp-tile.l4 { background: #fca5a5; color: #7f1d1d; }
+  .rp-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .rp-chip { background: #f1f5f9; border-radius: 12px; padding: 3px 9px; font-size: 12px; color: #334155; }
+  .rp-foot { margin-top: 8px; font-size: 10.5px; color: #94a3b8; }
+  .rp-err { color: #b91c1c; padding: 4px 0; }
+
+  /* Windy Panel */
+  #satPanel { position: absolute; inset: 0; z-index: 900; background: #000; display: none; }
+  #satFrame { display: block; width: 100%; height: 100%; border: 0; }
+  #satBar {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2;
+    display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 30px;
+    background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); color: #fff; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  }
+  #satBar a { color: #7dd3fc; text-decoration: none; font-size: 12px; font-weight: 500;}
+  #satBar a:hover { text-decoration: underline; }
+  #satBar button { background: #ef4444; color: #fff; border: 0; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-weight: 600;}
+  #satBar button:hover { background: #dc2626; }
+  body.sat-full .leaflet-control-container { display: none; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="ctl" id="ctl">
+  <div class="ctl-head" id="ctlHead" title="ยุบ/ขยายแถบ">
+    <span class="ttl">🌦 สภาพอากาศกระบี่ <a class="credit" href="https://www.facebook.com/hs8tv" target="_blank" rel="noopener" title="เปิดเพจเฟซบุ๊ก hs8tv" onclick="event.stopPropagation()">ผู้จัดทำ · hs8tv</a></span>
+    <button class="chev" id="ctlToggle" aria-label="ยุบ/ขยายแถบ">▲</button>
+  </div>
+  <div class="ctl-body">
+    <div class="clock">
+      <div id="clockDate" style="font-size: 13px; color: #64748b;"></div>
+      <div class="time" id="clockTime"></div>
+    </div>
+
+    <div class="title">เรดาร์ตรัง 240 กม.</div>
+    
+    <label class="toggle-row">
+      <span>แสดงเรดาร์</span>
+      <div class="switch"><input id="showRadar" type="checkbox" checked><span class="slider"></span></div>
+    </label>
+    <label class="toggle-row">
+      <span>แสดงกล้อง</span>
+      <div class="switch"><input id="showCam" type="checkbox" checked><span class="slider"></span></div>
+    </label>
+    <label class="toggle-row">
+      <span>สถานีฝน (กระบี่)</span>
+      <div class="switch"><input id="showRain" type="checkbox" checked><span class="slider"></span></div>
+    </label>
+    <label class="toggle-row">
+      <span>ภาพดาวเทียม (Windy)</span>
+      <div class="switch"><input id="showSat" type="checkbox"><span class="slider"></span></div>
+    </label>
+    
+    <a class="ext-link" href="https://krabi.thaiwater.net/dashboard" target="_blank" rel="noopener">💧 ข้อมูลน้ำระดับจังหวัด (กระบี่) ↗</a>
+  </div>
+</div>
+
+<div id="satPanel">
+  <div id="satBar">
+    <span>🛰️ ดาวเทียม (Windy) · กด <b>VIS</b> มุมซ้ายล่างเพื่อดูภาพสีจริง</span>
+    <a id="satOpen" target="_blank" rel="noopener">เปิดใน Windy ↗</a>
+    <button id="satClose">ปิด ✕</button>
+  </div>
+  <iframe id="satFrame" title="ดาวเทียม Windy" allowfullscreen></iframe>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script>
+  // ---- ตั้งค่า ----
+  const RADAR_URL = "https://weather.tmd.go.th/trg/trgHQloop.gif";
+  const RADAR_OPACITY = 0.7;
+  const BOUNDS = [[5.371138, 97.449294], [9.670696, 103.328589]];
+
+  const CAM_POS = [8.112268, 98.904501];
+  const MAP_CENTER = [7.52, 99.86];
+  const MAP_ZOOM = 8;
+
+  const SNAP_URL = "/cam.jpg";
+  const REFRESH_MS = 2000;
+  // ใช้ภาพ Static จาก Unsplash แทนเพื่อให้ชัวร์ว่าโหลดขึ้นแน่ๆ ไม่จอดำ
+  const FALLBACK_URL = "https://images.unsplash.com/photo-1541888049877-858c958124a2?auto=format&fit=crop&w=800&q=80";
+
+  const CAM_HOST = "http://live:Live2023!@bantakhlong.dyndns.info:5001";
+  const CAM_PAGE_URL = CAM_HOST + "/fullscreen.htm?stream=2&autoresize=true";
+  const SNAP_LINK = size => CAM_HOST + "/snap.jpg?JpegSize=" + size + "&JpegCam=1";
+
+  // ---- 1. แผนที่ ----
+  var map = L.map('map').setView(MAP_CENTER, MAP_ZOOM);
+
+  var googleLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+    maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: '&copy; Google'
+  });
+
+  var openTopoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17, subdomains: 'abc', attribution: '&copy; OpenTopoMap'
+  });
+
+  googleLayer.addTo(map);
+  L.control.layers({ "ภาพถ่ายดาวเทียม": googleLayer, "ภูมิประเทศ": openTopoLayer }, null, { position: 'topright' }).addTo(map);
+
+  // ---- 2. นาฬิกา ----
+  function thaiNow() {
+    const now = new Date();
+    const dateStr = new Intl.DateTimeFormat("th-TH", {
+      timeZone: "Asia/Bangkok", weekday: "long", day: "numeric", month: "long", year: "numeric"
+    }).format(now);
+    const p = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+    }).formatToParts(now);
+    return { dateStr, timeStr: p.find(x => x.type === "hour").value + ":" + p.find(x => x.type === "minute").value + " น." };
+  }
+  function updateClock() {
+    const t = thaiNow();
+    document.getElementById("clockDate").textContent = t.dateStr;
+    document.getElementById("clockTime").textContent = "เวลา " + t.timeStr;
+  }
+  updateClock();
+  setInterval(updateClock, 10 * 1000);
+
+  // ---- 3. เรดาร์ ----
+  let radar = L.imageOverlay(RADAR_URL + "?t=" + Date.now(), BOUNDS, { opacity: RADAR_OPACITY }).addTo(map);
+  document.getElementById("showRadar").onchange = e => e.target.checked ? radar.addTo(map) : map.removeLayer(radar);
+  setInterval(() => radar.setUrl(RADAR_URL + "?t=" + Date.now()), 5 * 60 * 1000);
+
+  // ---- 4. กล้องสะพานบ้านท่าคลอง ----
+  const icon = L.divIcon({ className: "", html: '<div class="cam-icon">📹</div>', iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -18] });
+  const marker = L.marker(CAM_POS, { icon, title: "สะพานบ้านท่าคลอง" }).addTo(map);
+
+  const popEl = document.createElement("div");
+  const COORD_TEXT = CAM_POS[0].toFixed(6) + ", " + CAM_POS[1].toFixed(6);
+  const STREETVIEW_URL = "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + CAM_POS[0] + "," + CAM_POS[1];
+  
+  popEl.innerHTML =
+    '<div class="pop-title">' +
+      '<div class="pop-title-text">📹 สะพานบ้านท่าคลอง</div>' +
+      '<div class="pop-actions">' +
+        '<a class="pop-coord" href="' + STREETVIEW_URL + '" target="_blank" rel="noopener">📍 ' + COORD_TEXT + '</a>' +
+        '<a class="btn-snap" href="' + SNAP_LINK("L") + '" target="_blank" rel="noopener" title="เปิดภาพนิ่งขนาดใหญ่จากกล้องต้นทาง">🖼️ ดูภาพนิ่ง</a>' +
+      '</div>' +
+    '</div>' +
+    '<div class="pop-box"><img id="camImg" alt="ภาพจากกล้อง" title="คลิกเพื่อดูภาพจากกล้องจริง"></div>';
+    
+  marker.bindPopup(popEl, { minWidth: 440, maxWidth: 440, autoPanPadding: [30, 30] });
+
+  const img = popEl.querySelector("#camImg");
+  let timer = null, running = false;
+
+  img.onclick = () => window.open(CAM_PAGE_URL, "_blank", "noopener");
+
+  function tick() {
+    if (!running) return;
+    
+    // สร้าง Object Image ใหม่เพื่อโหลดรูปเบื้องหลัง
+    const next = new Image();
+    next.onload = () => {
+      if (!running) return;
+      img.src = next.src; // เมื่อโหลดเสร็จค่อยเอามาใส่ (แก้ปัญหากะพริบ)
+      timer = setTimeout(tick, REFRESH_MS);
+    };
+    next.onerror = () => {
+      if (!running) return;
+      // ถ้าดึงภาพสดไม่ได้ ให้ใช้ภาพ Fallback
+      img.src = FALLBACK_URL;
+      timer = setTimeout(tick, 5000); // ลองใหม่ใน 5 วิ
+    };
+    // ใส่ Cache Buster กันเบราว์เซอร์จำภาพเก่า
+    next.src = SNAP_URL + "?t=" + Date.now();
+  }
+
+  marker.on("popupopen", () => {
+    running = true;
+    clearTimeout(timer);
+    // สำคัญ: โชว์ภาพ Fallback ไว้ก่อนทันที จะได้ไม่เห็นจอดำ
+    img.src = FALLBACK_URL; 
+    tick(); // แล้วค่อยไปดึงภาพสดทับ
+  });
+  
+  marker.on("popupclose", () => {
+    running = false;
+    clearTimeout(timer);
+    img.removeAttribute("src");
+  });
+
+  // ---- 4.1 กล้อง GISTDA เกาะลันตา ----
+  const LANTA_POS = [7.544683, 99.046249];
+  const LANTA_HLS = "https://coastalradar.gistda.or.th/cctvlive/hls/S057/playlist.m3u8";
+
+  const icon2 = L.divIcon({ className: "", html: '<div class="cam-icon gistda">📹</div>', iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -18] });
+  const marker2 = L.marker(LANTA_POS, { icon: icon2, title: "กล้อง GISTDA เกาะลันตา" }).addTo(map);
+
+  const lantaCoord = LANTA_POS[0].toFixed(6) + ", " + LANTA_POS[1].toFixed(6);
+  const lantaSV = "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + LANTA_POS[0] + "," + LANTA_POS[1];
+  const popEl2 = document.createElement("div");
+  
+  popEl2.innerHTML =
+    '<div class="pop-title">' +
+      '<div class="pop-title-text">📹 กล้อง GISTDA เกาะลันตา</div>' +
+      '<div class="pop-actions">' +
+        '<a class="pop-coord" href="' + lantaSV + '" target="_blank" rel="noopener">📍 ' + lantaCoord + '</a>' +
+      '</div>' +
+    '</div>' +
+    '<div class="pop-box">' +
+      '<video id="lantaVideo" muted autoplay playsinline controls></video>' +
+      '<button class="fs-btn" id="lantaFs" title="ดูแบบเต็มจอ">⛶ เต็มจอ</button>' +
+      '<div class="vid-msg" id="lantaMsg" style="display:none"></div>' +
+    '</div>';
+    
+  marker2.bindPopup(popEl2, { minWidth: 440, maxWidth: 440, autoPanPadding: [30, 30] });
+
+  const video = popEl2.querySelector("#lantaVideo");
+  const vmsg = popEl2.querySelector("#lantaMsg");
+  let hls = null, retryTimer = null;
+
+  popEl2.querySelector("#lantaFs").onclick = () => {
+    const fn = video.requestFullscreen || video.webkitRequestFullscreen || video.webkitEnterFullscreen;
+    if (fn) fn.call(video);
+  };
+
+  function stopLanta() {
+    clearTimeout(retryTimer);
+    if (hls) { hls.destroy(); hls = null; }
+    video.pause(); video.removeAttribute("src"); video.load(); vmsg.style.display = "none";
+  }
+  function showVmsg(text) { vmsg.textContent = text; vmsg.style.display = "block"; }
+
+  function startLanta() {
+    stopLanta();
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = LANTA_HLS;
+      video.play().catch(() => {});
+    } else if (window.Hls && Hls.isSupported()) {
+      hls = new Hls({ lowLatencyMode: true });
+      hls.loadSource(LANTA_HLS);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => { vmsg.style.display = "none"; video.play().catch(() => {}); });
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) {
+          showVmsg("ไม่สามารถเล่นภาพเคลื่อนไหวได้ในขณะนี้ — กำลังลองเชื่อมต่อใหม่");
+          retryTimer = setTimeout(() => { if (marker2.isPopupOpen()) startLanta(); }, 5000);
+        }
+      });
+    } else {
+      showVmsg("เบราว์เซอร์นี้ไม่รองรับการเล่นภาพเคลื่อนไหว (HLS)");
+    }
+  }
+  marker2.on("popupopen", startLanta);
+  marker2.on("popupclose", stopLanta);
+
+  document.getElementById("showCam").onchange = e => {
+    [marker, marker2].forEach(m => e.target.checked ? m.addTo(map) : map.removeLayer(m));
+  };
+
+  // ---- 4.2 สถานีวัดฝน ----
+  const RAIN_STATIONS = [
+    { id: 1086, name: "อ่างเก็บน้ำบางกำปรัด", pos: [8.2214, 99.1964] },
+    { id: 65,   name: "สถานีอุตุนิยมวิทยากระบี่", pos: [8.1036, 98.9753] },
+    { id: 1087, name: "สถานีอุตุนิยมวิทยาเกาะลันตา", pos: [7.5447, 99.0464], shift: [-20, 14] }
+  ];
+  const TMD_BASE = "https://wxmap.tmd.go.th";
+  let rainCache = { t: 0, data: null };
+
+  async function getJson(name) {
+    try {
+      const r = await fetch("/api/" + name, { cache: "no-store" });
+      if (r.ok && (r.headers.get("content-type") || "").includes("json")) return r.json();
+    } catch (e) {}
+    const r2 = await fetch(TMD_BASE + "/api/" + name, { cache: "no-store" });
+    if (!r2.ok) throw new Error("HTTP " + r2.status);
+    return r2.json();
+  }
+  async function loadRain() {
+    if (rainCache.data && Date.now() - rainCache.t < 60000) return rainCache.data;
+    const [rf, now] = await Promise.all([getJson("awsrainfall"), getJson("awsnow")]);
+    const pick = (j, id) => ((j && j.data) || []).find(d => +d.station_id === id && d.province_name_en === "Krabi") || null;
+    const data = {};
+    RAIN_STATIONS.forEach(st => { data[st.id] = { rf: pick(rf, st.id), now: pick(now, st.id) }; });
+    rainCache = { t: Date.now(), data };
+    return data;
+  }
+  const mm = v => (v === null || v === undefined || v === "") ? "–" : (+v).toFixed(1) + " มม.";
+  function thaiTime(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return iso || "–";
+    return new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short",
+      year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(d) + " น.";
+  }
+  const lvl = v => (v === null || v === undefined || v === "" || +v <= 0) ? "" : +v < 10 ? "l1" : +v < 35 ? "l2" : +v < 90 ? "l3" : "l4";
+  const num = v => (v === null || v === undefined || v === "") ? "–" : (+v).toFixed(1);
+  const tile = (v, lab) => '<div class="rp-tile ' + lvl(v) + '"><b>' + num(v) + '</b><small>' + lab + '</small></div>';
+  const head = (name, sub) => '<div class="rp-head"><div class="n">🌧 ' + name + '</div><div class="s">' + sub + '</div></div>';
+  
+  function renderRain(el, st, d) {
+    const n = d.now, r = d.rf;
+    if (!n && !r) { el.innerHTML = head(st.name, "สถานีวัดฝน กระบี่") + '<div class="rp-body rp-err">ไม่พบข้อมูลของสถานีนี้</div>'; return; }
+    const name = (n && n.station_name_th) || (r && r.station_name_th) || st.name;
+    let h = head(name, n ? "อัปเดต " + thaiTime(n.datetime_utc7) : "ข้อมูลฝนสะสม") + '<div class="rp-body">';
+    if (n) {
+      h += '<div class="rp-sec">ฝนล่าสุด (มม.)</div><div class="rp-grid">' +
+        tile(n.precip_15mins, "15 นาที") + tile(n.precip_1hr, "1 ชั่วโมง") + tile(n.precip_today, "วันนี้") + '</div>';
+    }
+    if (r) {
+      h += '<div class="rp-sec">ฝนสะสมย้อนหลัง (มม.)</div><div class="rp-grid">' +
+        tile(r.precip_yesterday, "เมื่อวาน") + tile(r.precip_3days, "3 วัน") + tile(r.precip_7days, "7 วัน") + '</div>';
+    }
+    if (n) h += '<div class="rp-chips"><span class="rp-chip">🌡 ' + (n.temperature ?? "–") + ' °C</span><span class="rp-chip">💧 ' +
+      (n.humidity ?? "–") + ' %</span></div>';
+    h += '<div class="rp-foot">ที่มา: กรมอุตุนิยมวิทยา (TMD)' + (r && r.date ? ' · สะสมถึง ' + r.date : '') + '</div></div>';
+    el.innerHTML = h;
+  }
+
+  const rainMarkers = RAIN_STATIONS.map(st => {
+    const icon = L.divIcon({ className: "", html: '<div class="rain-icon">🌧</div>',
+      iconSize: [32, 32], iconAnchor: st.shift ? [16 + st.shift[0], 16 + st.shift[1]] : [16, 16] });
+    const m = L.marker(st.pos, { icon, title: st.name }).addTo(map);
+    const el = document.createElement("div");
+    el.className = "rain-box";
+    m.bindPopup(el, { minWidth: 300, maxWidth: 300, className: "rain-popup" });
+    m.on("popupopen", async () => {
+      el.innerHTML = head(st.name, "กำลังโหลดข้อมูลฝน…");
+      m.getPopup().update();
+      try {
+        renderRain(el, st, (await loadRain())[st.id]);
+      } catch (e) {
+        el.innerHTML = head(st.name, "โหลดข้อมูลไม่สำเร็จ") + '<div class="rp-body rp-err">(' + e.message + ')</div>';
+      }
+      m.getPopup().update();
+    });
+    return m;
+  });
+  document.getElementById("showRain").onchange = e =>
+    rainMarkers.forEach(m => e.target.checked ? m.addTo(map) : map.removeLayer(m));
+
+  // ---- 5. ยุบ/ขยายแถบซ้าย ----
+  const ctl = document.getElementById("ctl");
+  try { if (localStorage.getItem("ctlCollapsed") === "1") ctl.classList.add("collapsed"); } catch (e) {}
+  document.getElementById("ctlHead").onclick = () => {
+    const c = ctl.classList.toggle("collapsed");
+    try { localStorage.setItem("ctlCollapsed", c ? "1" : "0"); } catch (e) {}
+  };
+
+  // ---- 6. Windy ----
+  const SAT_EMBED_URL =
+    "https://embed.windy.com/embed2.html?lat=7.52&lon=99.86&detailLat=8.112268&detailLon=98.904501" +
+    "&zoom=8&level=surface&overlay=satellite&product=satellite&menu=&message=true&marker=true" +
+    "&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1";
+  const SAT_OPEN_URL = "https://www.windy.com/th/-ดาวเทียม-satellite?satellite,7.52,99.86,8";
+
+  const satPanel = document.getElementById("satPanel");
+  const satFrame = document.getElementById("satFrame");
+  const showSat = document.getElementById("showSat");
+  document.getElementById("satOpen").href = SAT_OPEN_URL;
+
+  function setSat(on) {
+    showSat.checked = on;
+    document.body.classList.toggle("sat-full", on);
+    if (on) map.closePopup();
+    if (on) {
+      if (!satFrame.getAttribute("src")) satFrame.src = SAT_EMBED_URL;
+      satPanel.style.display = "block";
+    } else {
+      satPanel.style.display = "none";
+      satFrame.removeAttribute("src");
+    }
+  }
+  showSat.onchange = e => setSat(e.target.checked);
+  document.getElementById("satClose").onclick = () => setSat(false);
+</script>
+</body>
+</html>
