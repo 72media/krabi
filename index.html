@@ -227,10 +227,8 @@
   const MAP_CENTER = [7.52, 99.86];
   const MAP_ZOOM = 8;
 
-  const FALLBACK_URL = "https://raw.githubusercontent.com/72media/krabi/main/" + encodeURIComponent("สะพานบ้านท่าคลอง.jpg");
-  
-  // ไฟล์ GeoJSON จาก GitHub
-  const GEOJSON_URL = "https://raw.githubusercontent.com/72media/krabi/main/Krabi.geojson";
+  const FALLBACK_URL = "./" + encodeURIComponent("สะพานบ้านท่าคลอง.jpg");
+  const GEOJSON_URL = "./Krabi.geojson"; 
 
   const SNAP_URL = "/cam.jpg";
   const REFRESH_MS = 2000;
@@ -252,14 +250,13 @@
 
   googleLayer.addTo(map);
 
-  // ---> สร้าง Layer ขอบเขตจังหวัด (สีแดง) <---
+  // ---> สร้าง Layer ขอบเขตจังหวัด (เหลือแค่เส้นขอบ) <---
   var krabiBoundary = L.geoJSON(null, {
     style: {
       color: '#ef4444',      // สีเส้นขอบ (แดง)
       weight: 3.5,           // ความหนาเส้น
       opacity: 1,            // ความทึบของเส้น
-      fillColor: '#ef4444',  // สีพื้นหลัง
-      fillOpacity: 0.15,     // ความจางของพื้นหลัง (โปร่งใส)
+      fill: false,           // ปิดการถมสีพื้นหลัง
       dashArray: '5, 5'      // เส้นประ
     }
   });
@@ -267,7 +264,7 @@
   // ดึงข้อมูล GeoJSON
   fetch(GEOJSON_URL)
     .then(res => {
-      if (!res.ok) throw new Error("HTTP " + res.status + " - ไม่พบไฟล์ Krabi.geojson");
+      if (!res.ok) throw new Error("HTTP " + res.status + " - ไม่พบไฟล์ " + GEOJSON_URL);
       return res.json();
     })
     .then(data => {
