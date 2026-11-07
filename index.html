@@ -40,9 +40,24 @@
     width: 28px; height: 28px; border: 0; border-radius: 50%; cursor: pointer; padding: 0;
     background: rgba(255,255,255,.2); color: #fff; font-size: 12px; line-height: 28px; transition: transform .3s;
   }
+  .ctl-head .ico { font-size: 20px; line-height: 1; }
   .ctl.collapsed .chev { transform: rotate(180deg); }
   .ctl-body { padding: 14px 16px 16px; }
   .ctl.collapsed .ctl-body { display: none; }
+  /* ยุบเข้าด้านข้าง: เหลือแค่ปุ่มเล็ก ไอคอน + ลูกศร */
+  .ctl.collapsed { width: auto; }
+  .ctl.collapsed .ttl { display: none; }
+  .ctl.collapsed .ctl-head { padding: 8px 8px 8px 12px; gap: 8px; }
+  .ctl { max-height: calc(100vh - 110px); overflow-y: auto; }
+
+  /* มือถือ: แถบชิดบนซ้าย ซ่อนปุ่มซูม (ใช้สองนิ้วซูม) ป๊อปอัพปรับตามความกว้างจอ */
+  @media (max-width: 600px) {
+    .ctl { top: 10px; left: 10px; width: min(280px, calc(100vw - 76px)); max-height: calc(100vh - 20px); }
+    .ctl-head .ttl { font-size: 14px; }
+    .leaflet-control-zoom { display: none; }
+    .leaflet-top.leaflet-right { top: 0; }
+    #satBar { max-width: calc(100vw - 20px); flex-wrap: wrap; justify-content: center; gap: 6px 10px; font-size: 12px; }
+  }
   
   .ctl .clock { line-height: 1.4; color: #334155; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.08); margin-bottom: 12px; }
   .ctl .clock .time { font-size: 20px; font-weight: 700; color: #0b5cad; }
@@ -105,7 +120,7 @@
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
   }
 
-  .pop-box { width: 440px; max-width: 100%; aspect-ratio: 16 / 9; background: #1e293b; border-radius: 8px; overflow: hidden; position: relative; }
+  .pop-box { width: min(440px, calc(100vw - 70px)); max-width: 100%; aspect-ratio: 16 / 9; background: #1e293b; border-radius: 8px; overflow: hidden; position: relative; }
   .pop-box img { width: 100%; height: 100%; object-fit: contain; display: block; cursor: pointer; }
   .pop-box video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
 
@@ -135,7 +150,7 @@
   }
 
   .rain-popup .leaflet-popup-content-wrapper { padding: 0; overflow: hidden; border-radius: 14px; border: none; }
-  .rain-popup .leaflet-popup-content { margin: 0; width: 300px !important; }
+  .rain-popup .leaflet-popup-content { margin: 0; width: min(300px, calc(100vw - 50px)) !important; }
   .rain-popup a.leaflet-popup-close-button { color: #fff; top: 8px; right: 8px; }
   .rp-head { padding: 14px 36px 14px 16px; color: #fff; background: linear-gradient(135deg, #0284c7, #38bdf8); }
   .rp-head .n { font-size: 15px; font-weight: 700; line-height: 1.25; }
@@ -174,8 +189,8 @@
 
 <div class="ctl" id="ctl">
   <div class="ctl-head" id="ctlHead" title="ยุบ/ขยายแถบ">
-    <span class="ttl">🌦 สภาพอากาศกระบี่ <a class="credit" href="https://www.facebook.com/hs8tv" target="_blank" rel="noopener" title="เปิดเพจเฟซบุ๊ก hs8tv" onclick="event.stopPropagation()">ผู้จัดทำ · hs8tv</a></span>
-    <button class="chev" id="ctlToggle" aria-label="ยุบ/ขยายแถบ">▲</button>
+    <span class="ico">🌦</span><span class="ttl">สภาพอากาศกระบี่ <a class="credit" href="https://www.facebook.com/hs8tv" target="_blank" rel="noopener" title="เปิดเพจเฟซบุ๊ก hs8tv" onclick="event.stopPropagation()">ผู้จัดทำ · hs8tv</a></span>
+    <button class="chev" id="ctlToggle" aria-label="ยุบ/ขยายแถบ">◀</button>
   </div>
   <div class="ctl-body">
     <div class="clock">
@@ -227,15 +242,27 @@
   const MAP_CENTER = [7.52, 99.86];
   const MAP_ZOOM = 8;
 
-  const FALLBACK_URL = "./" + encodeURIComponent("สะพานบ้านท่าคลอง.jpg");
-  const GEOJSON_URL = "./Krabi.geojson"; 
+  // รูปสำรอง: ลองไฟล์ในโฟลเดอร์เดียวกันก่อน ถ้าไม่ได้ค่อยดึงจาก GitHub (raw) ตรงๆ
+  const FALLBACK_NAME = encodeURIComponent("สะพานบ้านท่าคลอง.jpg");
+  const FALLBACK_URLS = [
+    "./" + FALLBACK_NAME,
+    "https://raw.githubusercontent.com/72media/krabi/refs/heads/main/" + FALLBACK_NAME
+  ];
+  const GEOJSON_URLS = [
+    "./Krabi.geojson",
+    "https://raw.githubusercontent.com/72media/krabi/refs/heads/main/Krabi.geojson"
+  ];
 
   const SNAP_URL = "/cam.jpg";
   const REFRESH_MS = 2000;
 
   const CAM_HOST = "http://live:Live2023!@bantakhlong.dyndns.info:5001";
   const CAM_PAGE_URL = CAM_HOST + "/fullscreen.htm?stream=2&autoresize=true";
-  const SNAP_LINK = size => CAM_HOST + "/snap.jpg?JpegSize=" + size + "&JpegCam=1";
+  const SNAP_PAGE_URL = CAM_HOST + "/snap.jpg?JpegSize=XL&JpegCam=1";   // ภาพนิ่งจากต้นทาง
+
+  // ความกว้างป๊อปอัพ ปรับตามหน้าจอ
+  const POP_W = Math.min(440, window.innerWidth - 50);
+  const RAIN_W = Math.min(300, window.innerWidth - 50);
 
   // ---- 1. แผนที่ ----
   var map = L.map('map').setView(MAP_CENTER, MAP_ZOOM);
@@ -247,6 +274,14 @@
   var openTopoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
     maxZoom: 17, subdomains: 'abc', attribution: '&copy; OpenTopoMap'
   });
+
+  // แผนที่มืด (ฟรี ไม่ต้องใช้คีย์) จาก Esri Dark Gray Canvas + ชื่อสถานที่
+  var ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+  var darkLayer = L.layerGroup([
+    L.tileLayer(ESRI + 'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 16, maxZoom: 20,
+      attribution: 'Tiles &copy; Esri, HERE, Garmin, OpenStreetMap contributors' }),
+    L.tileLayer(ESRI + 'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 16, maxZoom: 20 })
+  ]);
 
   googleLayer.addTo(map);
 
@@ -261,23 +296,22 @@
     }
   });
 
-  // ดึงข้อมูล GeoJSON
-  fetch(GEOJSON_URL)
-    .then(res => {
-      if (!res.ok) throw new Error("HTTP " + res.status + " - ไม่พบไฟล์ " + GEOJSON_URL);
-      return res.json();
-    })
-    .then(data => {
-      krabiBoundary.addData(data);
-      console.log("✅ โหลดขอบเขตจังหวัดสำเร็จ");
-    })
-    .catch(err => {
-      console.warn("❌ ไม่สามารถโหลดขอบเขตจังหวัดได้:", err.message);
-    });
+  // ดึงข้อมูล GeoJSON (ไฟล์ในโฟลเดอร์ก่อน ไม่ได้ค่อยดึงจาก GitHub)
+  (async () => {
+    for (const url of GEOJSON_URLS) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        krabiBoundary.addData(await res.json());
+        console.log("โหลดขอบเขตจังหวัดสำเร็จ:", url);
+        return;
+      } catch (err) { console.warn("โหลดขอบเขตไม่ได้ที่", url, err.message); }
+    }
+  })();
 
   // เพิ่มเป็น Overlay Layer (ตัวเลือกมุมขวาบน)
   L.control.layers(
-    { "ภาพถ่ายดาวเทียม": googleLayer, "ภูมิประเทศ": openTopoLayer }, 
+    { "ภาพถ่ายดาวเทียม": googleLayer, "ภูมิประเทศ": openTopoLayer, "แผนที่มืด": darkLayer }, 
     { "ขอบเขตจังหวัดกระบี่": krabiBoundary }, 
     { position: 'topright' }
   ).addTo(map);
@@ -319,29 +353,44 @@
       '<div class="pop-title-text">📹 สะพานบ้านท่าคลอง</div>' +
       '<div class="pop-actions">' +
         '<a class="pop-coord" href="' + STREETVIEW_URL + '" target="_blank" rel="noopener">📍 ' + COORD_TEXT + '</a>' +
-        '<a class="btn-snap" href="' + SNAP_LINK("L") + '" target="_blank" rel="noopener" title="เปิดภาพนิ่งขนาดใหญ่จากกล้องต้นทาง">🖼️ ดูภาพนิ่ง</a>' +
+        '<a class="btn-snap" href="' + CAM_PAGE_URL + '" target="_blank" rel="noopener" title="เปิดภาพสดจากกล้องต้นทางในหน้าใหม่">🔴 ภาพสด</a>' +
       '</div>' +
     '</div>' +
-    '<div class="pop-box"><img id="camImg" alt="ภาพจากกล้อง" title="คลิกเพื่อดูภาพจากกล้องจริง"></div>';
+    '<div class="pop-box"><img id="camImg" alt="ภาพจากกล้อง" title="คลิกเพื่อดูภาพนิ่งจากกล้องต้นทาง"></div>';
     
-  marker.bindPopup(popEl, { minWidth: 440, maxWidth: 440, autoPanPadding: [30, 30] });
+  marker.bindPopup(popEl, { minWidth: POP_W, maxWidth: POP_W, autoPanPadding: [30, 30] });
 
   const img = popEl.querySelector("#camImg");
   let timer = null, running = false;
 
-  img.onclick = () => window.open(CAM_PAGE_URL, "_blank", "noopener");
+  // คลิกที่ภาพ -> เปิดภาพนิ่งจากกล้องต้นทางในหน้าใหม่
+  img.onclick = () => window.open(SNAP_PAGE_URL, "_blank", "noopener");
 
+  // แสดงรูปสำรอง (ลองทีละแหล่ง)
+  let fbIdx = 0;
+  function showFallback() {
+    if (img.dataset.fb === "1" && img.getAttribute("src")) return;   // กำลังแสดงรูปสำรองอยู่แล้ว
+    fbIdx = 0;
+    img.dataset.fb = "1";
+    img.src = FALLBACK_URLS[0];
+  }
+  img.onerror = () => {                                                // รูปสำรองแหล่งแรกโหลดไม่ได้ -> ลองแหล่งถัดไป
+    if (img.dataset.fb === "1" && fbIdx < FALLBACK_URLS.length - 1) img.src = FALLBACK_URLS[++fbIdx];
+  };
+
+  // โหลดภาพสดไว้ก่อนแล้วค่อยสลับ (ไม่กะพริบ)
   function tick() {
     if (!running) return;
     const next = new Image();
     next.onload = () => {
       if (!running) return;
+      img.dataset.fb = "0";
       img.src = next.src;
       timer = setTimeout(tick, REFRESH_MS);
     };
     next.onerror = () => {
       if (!running) return;
-      img.src = FALLBACK_URL;
+      showFallback();
       timer = setTimeout(tick, 5000);
     };
     next.src = SNAP_URL + "?t=" + Date.now();
@@ -350,14 +399,15 @@
   marker.on("popupopen", () => {
     running = true;
     clearTimeout(timer);
-    img.src = FALLBACK_URL; 
-    tick(); 
+    showFallback();     // โชว์รูปสำรองระหว่างรอภาพสด
+    tick();
   });
-  
+
   marker.on("popupclose", () => {
     running = false;
     clearTimeout(timer);
     img.removeAttribute("src");
+    img.dataset.fb = "0";
   });
 
   // ---- 4.1 กล้อง GISTDA เกาะลันตา ----
@@ -384,7 +434,7 @@
       '<div class="vid-msg" id="lantaMsg" style="display:none"></div>' +
     '</div>';
     
-  marker2.bindPopup(popEl2, { minWidth: 440, maxWidth: 440, autoPanPadding: [30, 30] });
+  marker2.bindPopup(popEl2, { minWidth: POP_W, maxWidth: POP_W, autoPanPadding: [30, 30] });
 
   const video = popEl2.querySelector("#lantaVideo");
   const vmsg = popEl2.querySelector("#lantaMsg");
@@ -493,7 +543,7 @@
     const m = L.marker(st.pos, { icon, title: st.name }).addTo(map);
     const el = document.createElement("div");
     el.className = "rain-box";
-    m.bindPopup(el, { minWidth: 300, maxWidth: 300, className: "rain-popup" });
+    m.bindPopup(el, { minWidth: RAIN_W, maxWidth: RAIN_W, className: "rain-popup" });
     m.on("popupopen", async () => {
       el.innerHTML = head(st.name, "กำลังโหลดข้อมูลฝน…");
       m.getPopup().update();
